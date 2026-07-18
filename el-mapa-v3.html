@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <!-- Meta Pixel -->
 <script>
 !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -258,9 +259,39 @@ footer{margin-top:38px;padding-top:22px;border-top:1px solid var(--line);text-al
   .ob-btn-back{background:none;border:none;font-family:'Montserrat',sans-serif;font-size:12.5px;font-weight:600;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;cursor:pointer;padding:8px 0;transition:color .18s;}
   .ob-btn-back:hover{color:var(--gold);}
 
+  /* ---------- GATE DE CLAVE ---------- */
+  .gate-overlay{
+    position:fixed; inset:0; background:var(--cream); z-index:2000;
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .gate-box{max-width:340px; width:100%; text-align:center;}
+  .gate-box .brand-label{margin-bottom:18px; font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--gold); font-weight:600;}
+  .gate-box h2{font-family:'Playfair Display',serif; font-size:24px; margin-bottom:10px; color:var(--ink);}
+  .gate-box p{font-size:14px; color:var(--ink-soft); margin-bottom:22px; line-height:1.5;}
+  .gate-input{
+    width:100%; padding:13px 16px; border-radius:100px;
+    border:1.5px solid var(--line); font-family:'Montserrat',sans-serif;
+    font-size:15px; text-align:center; margin-bottom:14px; background:var(--card); color:var(--ink);
+  }
+  .gate-input:focus{outline:none; border-color:var(--gold);}
+  .gate-error{color:#B0453A; font-size:13px; margin-bottom:10px; display:none;}
+  body.locked > *:not(.gate-overlay){display:none !important;}
+
 </style>
 </head>
-<body>
+<body class="locked">
+
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-box">
+    <div class="brand-label">El Mapa · Transformación y Luz</div>
+    <h2>Tu espacio privado</h2>
+    <p>Escribe la clave que te llegó en tu correo de compra para entrar a tu mapa.</p>
+    <input type="text" class="gate-input" id="gateInput" placeholder="Clave de acceso" autocomplete="off">
+    <p class="gate-error" id="gateError">Esa clave no es correcta. Revisa tu correo de compra e inténtalo de nuevo.</p>
+    <button class="btn btn-gold" onclick="checkGate()" style="width:100%;">Entrar</button>
+  </div>
+</div>
+
 <div id="progressBar"></div>
 
 <!-- S1 BIENVENIDA -->
@@ -588,6 +619,11 @@ footer{margin-top:38px;padding-top:22px;border-top:1px solid var(--line);text-al
       <div class="practice-step-label" id="kitPasoLabel">Momento 3 — Tu paso concreto</div>
       <div class="practice-text" id="kitPaso"></div>
     </div>
+  </div>
+  <div style="text-align:center;margin:26px 0 4px;">
+    <button onclick="downloadResultPDF()" style="display:inline-block;border:1.5px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;text-align:center;padding:14px 26px;border-radius:60px;">
+      ↓ Descargar mi mapa en PDF
+    </button>
   </div>
   <div class="cta"><button class="btn btn-gold" onclick="goTo('s-bonos')">Ver mis herramientas para llevar →</button></div>
 </div>
@@ -1304,6 +1340,163 @@ function checkPurchased() {
   }
   goTo('s-ob-1');
 }
+
+/* ============================================================
+   GATE DE CLAVE — protege el acceso al producto
+   La clave se entrega en el correo automático de Hotmart tras
+   la compra. Si llega recién comprado (?purchased=true) se
+   desbloquea automático una vez, sin pedir clave.
+   ============================================================ */
+var STORAGE_PREFIX_MAPA = 'elmapa_';
+var GATE_PASSWORD_MAPA = 'MAPA2026';
+
+function checkGate(){
+  var input = document.getElementById('gateInput');
+  var error = document.getElementById('gateError');
+  if (input.value.trim().toUpperCase() === GATE_PASSWORD_MAPA){
+    sessionStorage.setItem(STORAGE_PREFIX_MAPA + 'unlocked', 'true');
+    document.getElementById('gateOverlay').style.display = 'none';
+    document.body.classList.remove('locked');
+    error.style.display = 'none';
+    checkPurchased();
+  } else {
+    error.style.display = 'block';
+  }
+}
+var gateInputElMapa = document.getElementById('gateInput');
+if (gateInputElMapa){
+  gateInputElMapa.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') checkGate();
+  });
+}
+
+(function initGateMapa(){
+  var params = new URLSearchParams(window.location.search);
+  var justPurchased = params.get('purchased') === 'true';
+  var alreadyUnlocked = sessionStorage.getItem(STORAGE_PREFIX_MAPA + 'unlocked') === 'true';
+  if (justPurchased || alreadyUnlocked){
+    sessionStorage.setItem(STORAGE_PREFIX_MAPA + 'unlocked', 'true');
+    document.getElementById('gateOverlay').style.display = 'none';
+    document.body.classList.remove('locked');
+    checkPurchased();
+  }
+})();
+
+/* ============================================================
+   DESCARGA DEL MAPA EN PDF
+   Toma lo que ya está renderizado en pantalla (perfil + kit)
+   y genera un PDF de resumen para que se lo lleve como recuerdo.
+   ============================================================ */
+function downloadResultPDF(){
+  if (typeof window.jspdf === 'undefined'){
+    alert('No se pudo generar el PDF, intenta de nuevo en unos segundos.');
+    return;
+  }
+  var jsPDF = window.jspdf.jsPDF;
+  var doc = new jsPDF({ unit: 'pt', format: 'a4' });
+  var pageWidth = doc.internal.pageSize.getWidth();
+  var pageHeight = doc.internal.pageSize.getHeight();
+  var margin = 56;
+  var maxWidth = pageWidth - margin * 2;
+  var y = 80;
+
+  var gold = [176, 141, 87];
+  var ink = [58, 46, 38];
+  var inkSoft = [107, 93, 82];
+
+  function getText(id){
+    var el = document.getElementById(id);
+    return el ? el.textContent.trim() : '';
+  }
+  function checkPage(needed){
+    if (y + needed > pageHeight - margin){
+      doc.addPage();
+      y = 80;
+    }
+  }
+  function heading(text){
+    checkPage(30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(ink[0], ink[1], ink[2]);
+    doc.text(text, margin, y);
+    y += 18;
+  }
+  function paragraph(text){
+    if (!text) return;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(ink[0], ink[1], ink[2]);
+    var lines = doc.splitTextToSize(text, maxWidth);
+    checkPage(lines.length * 15);
+    doc.text(lines, margin, y);
+    y += lines.length * 15 + 20;
+  }
+
+  var nombre = (typeof userName !== 'undefined' && userName) ? userName : 'Tu resultado';
+
+  doc.setTextColor(gold[0], gold[1], gold[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('EL MAPA · ROMPE EL PATRÓN · TRANSFORMACIÓN Y LUZ', margin, y);
+  y += 34;
+
+  doc.setTextColor(ink[0], ink[1], ink[2]);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(nombre + ', tu perfil relacional es', margin, y);
+  y += 30;
+
+  doc.setFontSize(24);
+  doc.text(getText('profileName') || getText('kitName'), margin, y);
+  y += 26;
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(13);
+  doc.setTextColor(inkSoft[0], inkSoft[1], inkSoft[2]);
+  var quote = getText('profileQuote');
+  if (quote){
+    var quoteLines = doc.splitTextToSize(quote, maxWidth);
+    doc.text(quoteLines, margin, y);
+    y += quoteLines.length * 17 + 20;
+  } else {
+    y += 20;
+  }
+
+  heading('Cómo se ve esto en tu vida');
+  paragraph(getText('profileBody'));
+
+  heading('Por qué el patrón se sostiene');
+  paragraph(getText('profileWhy'));
+
+  heading('Tu pregunta filtro');
+  paragraph(getText('kitFilterQ'));
+
+  heading('Tu práctica de 5 minutos — Detectar');
+  paragraph(getText('kitDetect'));
+
+  heading('Nombrar');
+  paragraph(getText('kitNombre'));
+
+  heading('Tu paso concreto');
+  paragraph(getText('kitPaso'));
+
+  checkPage(40);
+  doc.setDrawColor(gold[0], gold[1], gold[2]);
+  doc.setLineWidth(0.6);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 26;
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(10.5);
+  doc.setTextColor(inkSoft[0], inkSoft[1], inkSoft[2]);
+  doc.text('Este resultado es un punto de partida para tu proceso, no un diagnóstico', margin, y);
+  y += 14;
+  doc.text('psicológico ni médico. transformacionyluz · @transformacionyluz', margin, y);
+
+  doc.save('mi-mapa-rompe-el-patron.pdf');
+}
+
 checkPurchased();
 
 </script>
