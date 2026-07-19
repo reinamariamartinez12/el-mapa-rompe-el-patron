@@ -499,6 +499,11 @@ footer{margin-top:38px;padding-top:22px;border-top:1px solid var(--line);text-al
     <p class="body-text" id="profileWhy"></p>
     <div class="science-note">Base científica: <em id="profileScience"></em></div>
   </div>
+  <div style="text-align:center;margin:22px 0 4px;">
+    <button onclick="downloadResultPDF()" style="display:inline-block;border:1.5px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer;font-family:'Montserrat',sans-serif;font-weight:700;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;text-align:center;padding:14px 26px;border-radius:60px;">
+      ↓ Descargar mi resultado en PDF
+    </button>
+  </div>
   <div class="cta">
     <button class="btn btn-primary" onclick="goTo('s-mapa')">Ver cómo se ve en mis relaciones →</button>
   </div>
@@ -1432,6 +1437,11 @@ function downloadResultPDF(){
     doc.text(lines, margin, y);
     y += lines.length * 15 + 20;
   }
+  function section(title, text){
+    if (!text) return;
+    heading(title);
+    paragraph(text);
+  }
 
   var nombre = (typeof userName !== 'undefined' && userName) ? userName : 'Tu resultado';
 
@@ -1463,23 +1473,12 @@ function downloadResultPDF(){
     y += 20;
   }
 
-  heading('Cómo se ve esto en tu vida');
-  paragraph(getText('profileBody'));
-
-  heading('Por qué el patrón se sostiene');
-  paragraph(getText('profileWhy'));
-
-  heading('Tu pregunta filtro');
-  paragraph(getText('kitFilterQ'));
-
-  heading('Tu práctica de 5 minutos — Detectar');
-  paragraph(getText('kitDetect'));
-
-  heading('Nombrar');
-  paragraph(getText('kitNombre'));
-
-  heading('Tu paso concreto');
-  paragraph(getText('kitPaso'));
+  section('Cómo se ve esto en tu vida', getText('profileBody'));
+  section('Por qué el patrón se sostiene', getText('profileWhy'));
+  section('Tu pregunta filtro', getText('kitFilterQ'));
+  section('Tu práctica de 5 minutos — Detectar', getText('kitDetect'));
+  section('Nombrar', getText('kitNombre'));
+  section('Tu paso concreto', getText('kitPaso'));
 
   checkPage(40);
   doc.setDrawColor(gold[0], gold[1], gold[2]);
